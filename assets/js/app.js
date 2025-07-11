@@ -1,6 +1,7 @@
 // If you want to use Phoenix channels, run `mix help phx.gen.channel`
 // to get started and then uncomment the line below.
-// import "./user_socket.js"
+import "./user_socket.js"
+import { webrtcChannel } from "./user_socket.js"
 
 // You can include dependencies in two ways.
 //
@@ -42,3 +43,25 @@ liveSocket.connect()
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
 
+// WebRTC setup wrapped in async function
+async function setupWebRTC() {
+  const pc = new RTCPeerConnection({
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+  })
+  const localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+  for (const track of localStream.getTracks()) {
+    pc.addTrack(track, localStream);
+  }
+  const offer = await pc.createOffer();
+  // offer == { type: "offer", sdp: "<SDP here>"}
+  await pc.setLocalDescription(offer);
+  const json = JSON.stringify(offer);
+
+  // Send offer through Phoenix channel
+  webrtcChannel.push("offer", { offer: json })
+    .receive("ok", resp => console.log("Offer sent successfully", resp))
+    .receive("error", resp => console.log("Failed to send offer", resp))
+}
+
+// Initialize WebRTC when the page loads
+setupWebRTC().catch(console.error);
