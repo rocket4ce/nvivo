@@ -1,7 +1,6 @@
 // If you want to use Phoenix channels, run `mix help phx.gen.channel`
 // to get started and then uncomment the line below.
 import "./user_socket.js"
-import { webrtcChannel } from "./user_socket.js"
 
 // You can include dependencies in two ways.
 //
@@ -23,10 +22,80 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 
+// Chat Room Hook for WebRTC functionality
+let Hooks = {}
+
+Hooks.ChatRoom = {
+  mounted() {
+    const roomCode = this.el.dataset.roomCode
+    const userId = this.el.dataset.userId || `guest_${Date.now()}`
+
+    // Initialize ChatRoomManager
+    this.chatManager = new window.ChatRoomManager()
+    this.chatManager.joinRoom(roomCode, userId)
+
+    // Setup UI event handlers
+    this.setupEventHandlers()
+  },
+
+  destroyed() {
+    if (this.chatManager) {
+      this.chatManager.leaveRoom()
+    }
+  },
+
+  setupEventHandlers() {
+    // Video toggle
+    const videoButton = document.getElementById('toggle-video')
+    if (videoButton) {
+      videoButton.addEventListener('click', () => {
+        this.chatManager.toggleVideo()
+      })
+    }
+
+    // Audio toggle
+    const audioButton = document.getElementById('toggle-audio')
+    if (audioButton) {
+      audioButton.addEventListener('click', () => {
+        this.chatManager.toggleAudio()
+      })
+    }
+
+    // Message form
+    const messageForm = document.getElementById('message-form')
+    const messageInput = document.getElementById('message-input')
+
+    if (messageForm && messageInput) {
+      messageForm.addEventListener('submit', (e) => {
+        e.preventDefault()
+        const message = messageInput.value.trim()
+        if (message) {
+          this.chatManager.sendMessage(message)
+          messageInput.value = ''
+        }
+      })
+
+      // Handle typing indicators
+      let typingTimer
+      messageInput.addEventListener('input', () => {
+        if (this.chatManager.chatChannel) {
+          this.chatManager.chatChannel.push("typing_start", {})
+
+          clearTimeout(typingTimer)
+          typingTimer = setTimeout(() => {
+            this.chatManager.chatChannel.push("typing_stop", {})
+          }, 1000)
+        }
+      })
+    }
+  }
+}
+
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
-  params: {_csrf_token: csrfToken}
+  params: {_csrf_token: csrfToken},
+  hooks: Hooks
 })
 
 // Show progress bar on live navigation and form submits
@@ -42,26 +111,3 @@ liveSocket.connect()
 // >> liveSocket.enableLatencySim(1000)  // enabled for duration of browser session
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
-
-// WebRTC setup wrapped in async function
-async function setupWebRTC() {
-  const pc = new RTCPeerConnection({
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-  })
-  const localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-  for (const track of localStream.getTracks()) {
-    pc.addTrack(track, localStream);
-  }
-  const offer = await pc.createOffer();
-  // offer == { type: "offer", sdp: "<SDP here>"}
-  await pc.setLocalDescription(offer);
-  const json = JSON.stringify(offer);
-
-  // Send offer through Phoenix channel
-  webrtcChannel.push("offer", { offer: json })
-    .receive("ok", resp => console.log("Offer sent successfully", resp))
-    .receive("error", resp => console.log("Failed to send offer", resp))
-}
-
-// Initialize WebRTC when the page loads
-setupWebRTC().catch(console.error);
