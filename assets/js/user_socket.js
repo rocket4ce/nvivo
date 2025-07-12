@@ -311,8 +311,14 @@ class ChatRoomManager {
 
   // Switch video to main view
   switchToMainVideo(videoId) {
+    console.log(`Switching to main video: ${videoId}`)
     const mainVideoElement = document.getElementById('main-video-element')
     const mainVideoLabel = document.getElementById('main-video-label')
+
+    if (!mainVideoElement || !mainVideoLabel) {
+      console.error('Main video elements not found')
+      return
+    }
 
     if (videoId === 'local') {
       const localVideo = document.getElementById('local-video')
@@ -320,6 +326,9 @@ class ChatRoomManager {
         mainVideoElement.srcObject = localVideo.srcObject
         mainVideoElement.muted = true // Mute local video to avoid feedback
         mainVideoLabel.textContent = 'You'
+        console.log('Switched to local video')
+      } else {
+        console.error('Local video not found or no stream')
       }
     } else {
       const remoteVideo = document.getElementById(`video-${videoId}`)
@@ -328,8 +337,20 @@ class ChatRoomManager {
         if (video && video.srcObject) {
           mainVideoElement.srcObject = video.srcObject
           mainVideoElement.muted = false // Enable audio for remote videos
-          mainVideoLabel.textContent = `User ${videoId}`
+
+          // Format user display name for main video label
+          let displayName = `User ${videoId}`
+          if (videoId.startsWith('guest_')) {
+            const guestId = videoId.slice(-8) // Last 8 characters
+            displayName = `Guest ${guestId}`
+          }
+          mainVideoLabel.textContent = displayName
+          console.log(`Switched to remote video: ${displayName}`)
+        } else {
+          console.error(`Remote video ${videoId} not found or no stream`)
         }
+      } else {
+        console.error(`Video container for ${videoId} not found`)
       }
     }
   }
@@ -679,8 +700,15 @@ window.ChatRoomManager = ChatRoomManager
 
 // Make switchToMainVideo globally accessible
 window.switchToMainVideo = function(videoId) {
+  console.log(`Global switchToMainVideo called with: ${videoId}`)
   if (window.currentChatManager) {
     window.currentChatManager.switchToMainVideo(videoId)
+  } else {
+    console.error('ChatManager not available yet')
+    // Fallback to the basic function that's also defined in the HTML template
+    if (typeof switchToMainVideoFallback === 'function') {
+      switchToMainVideoFallback(videoId)
+    }
   }
 }
 
