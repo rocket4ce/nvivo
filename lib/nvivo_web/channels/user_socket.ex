@@ -8,6 +8,7 @@ defmodule NvivoWeb.UserSocket do
 
   ## Channels
   channel "webrtc:*", NvivoWeb.WebRTCChannel
+  channel "chat_room:*", NvivoWeb.ChatRoomChannel
 
   # Socket params are passed from the client and can
   # be used to verify and authenticate a user. After

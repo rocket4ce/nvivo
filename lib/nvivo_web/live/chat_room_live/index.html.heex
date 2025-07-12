@@ -1,0 +1,139 @@
+<div class="bg-gray-50 min-h-screen">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold text-gray-900">Chat Rooms</h1>
+      <p class="mt-2 text-gray-600">
+        Join a room or create your own to start video calling and chatting
+      </p>
+    </div>
+    
+<!-- Actions -->
+    <div class="mb-8 flex flex-col sm:flex-row gap-4">
+      <%= if @current_users do %>
+        <.link
+          patch={~p"/chat_rooms/new"}
+          class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium text-center"
+        >
+          Create New Room
+        </.link>
+      <% else %>
+        <.link
+          navigate={~p"/users/log_in"}
+          class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium text-center"
+        >
+          Login to Create Room
+        </.link>
+      <% end %>
+      
+<!-- Join by code -->
+      <form phx-submit="join_by_code" class="flex gap-2">
+        <input
+          type="text"
+          name="room_code"
+          placeholder="Enter room code"
+          class="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          required
+        />
+        <button
+          type="submit"
+          class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
+        >
+          Join Room
+        </button>
+      </form>
+    </div>
+    
+<!-- Room List -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <%= for room <- @chat_rooms do %>
+        <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+          <div class="flex items-start justify-between mb-4">
+            <h3 class="text-xl font-semibold text-gray-900 truncate">{room.name}</h3>
+            <span class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">
+              {length(room.participants)}/{room.max_participants}
+            </span>
+          </div>
+
+          <%= if room.description do %>
+            <p class="text-gray-600 mb-4 text-sm">{room.description}</p>
+          <% end %>
+
+          <div class="mb-4">
+            <p class="text-xs text-gray-500">Created by: {room.creator.email}</p>
+            <p class="text-xs text-gray-500">
+              Room Code: <span class="font-mono font-bold">{room.room_code}</span>
+            </p>
+          </div>
+
+          <button
+            phx-click="join_room"
+            phx-value-room_code={room.room_code}
+            class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            Join Room
+          </button>
+        </div>
+      <% end %>
+    </div>
+
+    <%= if Enum.empty?(@chat_rooms) do %>
+      <div class="text-center py-12">
+        <div class="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+          <svg
+            class="w-12 h-12 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+            >
+            </path>
+          </svg>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">No chat rooms available</h3>
+        <p class="text-gray-500">Be the first to create a chat room!</p>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<!-- Modal for creating new room -->
+<%= if @show_modal do %>
+  <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+      <div class="mt-3">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Create New Chat Room</h3>
+
+        <.simple_form :let={f} for={@changeset} phx-change="validate" phx-submit="save">
+          <.input field={f[:name]} type="text" label="Room Name" required />
+          <.input field={f[:description]} type="textarea" label="Description (optional)" />
+          <.input
+            field={f[:max_participants]}
+            type="number"
+            label="Max Participants"
+            value="10"
+            min="2"
+            max="50"
+          />
+          <.input field={f[:is_public]} type="checkbox" label="Public Room" checked />
+
+          <div class="flex gap-3 mt-6">
+            <.button type="submit" class="flex-1">Create Room</.button>
+            <.button
+              type="button"
+              phx-click="close_modal"
+              class="flex-1 bg-gray-500 hover:bg-gray-600"
+            >
+              Cancel
+            </.button>
+          </div>
+        </.simple_form>
+      </div>
+    </div>
+  </div>
+<% end %>

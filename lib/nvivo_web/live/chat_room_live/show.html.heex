@@ -1,0 +1,526 @@
+<div
+  id="chat-room"
+  class="h-screen flex flex-col bg-gray-900"
+  phx-hook="ChatRoom"
+  data-room-code={@room_code}
+  data-user-id={@current_users && @current_users.id}
+>
+  
+<!-- Header -->
+  <div class="bg-gray-800 shadow-lg px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+    <div class="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
+      <h1 class="text-lg sm:text-xl font-semibold text-white truncate">{@room.name}</h1>
+      <span class="bg-blue-600 text-blue-100 text-xs font-medium px-2 py-0.5 rounded hidden sm:inline">
+        {@room_code}
+      </span>
+      <span class="bg-green-600 text-green-100 text-xs font-medium px-2 py-0.5 rounded hidden sm:inline">
+        <span id="participant-count">{length(@room.participants)}</span> participants
+      </span>
+    </div>
+    
+<!-- Mobile info (visible on small screens) -->
+    <div class="flex items-center space-x-2 sm:hidden">
+      <span class="bg-blue-600 text-blue-100 text-xs font-medium px-2 py-0.5 rounded">
+        {@room_code}
+      </span>
+      <span class="bg-green-600 text-green-100 text-xs font-medium px-1.5 py-0.5 rounded">
+        <span id="participant-count-mobile">{length(@room.participants)}</span>
+      </span>
+    </div>
+
+    <div class="flex items-center space-x-1 sm:space-x-3">
+      <!-- Video/Audio Controls -->
+      <button
+        id="toggle-video"
+        class="bg-gray-700 text-white p-2 sm:p-3 rounded-full hover:bg-gray-600 transition-colors touch-manipulation"
+        title="Toggle Video"
+      >
+        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+          >
+          </path>
+        </svg>
+      </button>
+
+      <button
+        id="toggle-audio"
+        class="bg-gray-700 text-white p-2 sm:p-3 rounded-full hover:bg-gray-600 transition-colors touch-manipulation"
+        title="Toggle Audio"
+      >
+        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+          >
+          </path>
+        </svg>
+      </button>
+      
+<!-- Chat Toggle -->
+      <button
+        id="toggle-chat"
+        class="bg-gray-700 text-white p-2 sm:p-3 rounded-full hover:bg-gray-600 transition-colors touch-manipulation"
+        title="Toggle Chat"
+        onclick="toggleChatSidebar()"
+      >
+        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.959 8.959 0 01-4.906-1.435L3 21l2.435-5.094A8.959 8.959 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z"
+          >
+          </path>
+        </svg>
+      </button>
+
+      <button
+        phx-click="leave_room"
+        class="bg-red-600 text-white px-3 sm:px-4 py-2 rounded-full hover:bg-red-700 transition-colors text-sm touch-manipulation"
+      >
+        <span class="hidden sm:inline">Leave</span>
+        <svg class="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+          >
+          </path>
+        </svg>
+      </button>
+    </div>
+  </div>
+  
+<!-- Main Content -->
+  <div class="flex-1 flex flex-col lg:flex-row relative overflow-hidden">
+    <!-- Video Area -->
+    <div class="flex-1 relative order-2 lg:order-1">
+      <!-- Main Video Container -->
+      <div id="main-video-container" class="w-full h-full relative bg-gray-900">
+        <!-- Main Video (currently speaking or featured) -->
+        <div id="main-video" class="w-full h-full flex items-center justify-center">
+          <video
+            id="main-video-element"
+            autoplay
+            playsinline
+            class="w-full h-full object-cover rounded-none sm:rounded-lg"
+          >
+          </video>
+          <div class="absolute bottom-2 sm:bottom-4 left-2 sm:left-4 bg-black bg-opacity-60 text-white px-2 sm:px-3 py-1 rounded-lg text-sm">
+            <span id="main-video-label">You</span>
+          </div>
+        </div>
+      </div>
+      
+<!-- Participants Strip (Bottom) -->
+      <div
+        id="participants-strip"
+        class="absolute bottom-2 sm:bottom-4 left-2 sm:left-4 right-2 sm:right-4 flex space-x-1 sm:space-x-2 overflow-x-auto"
+      >
+        <!-- Local Video Thumbnail -->
+        <div
+          class="relative bg-gray-800 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all flex-shrink-0"
+          onclick="switchToMainVideo('local')"
+        >
+          <video
+            id="local-video"
+            autoplay
+            muted
+            playsinline
+            class="w-20 h-14 sm:w-32 sm:h-24 object-cover"
+          >
+          </video>
+          <div class="absolute bottom-0.5 left-0.5 sm:bottom-1 sm:left-1 bg-black bg-opacity-60 text-white px-1 sm:px-2 py-0.5 rounded text-xs">
+            You
+          </div>
+        </div>
+        
+<!-- Remote videos will be added here dynamically -->
+        <div id="remote-videos-container" class="flex space-x-1 sm:space-x-2">
+          <!-- Remote participant thumbnails will be inserted here -->
+        </div>
+      </div>
+    </div>
+    
+<!-- Chat Sidebar -->
+    <div
+      id="chat-sidebar"
+      class="w-full lg:w-80 bg-gray-800 border-t lg:border-t-0 lg:border-l border-gray-700 flex flex-col order-1 lg:order-2 h-1/3 lg:h-full hidden lg:flex"
+    >
+      <!-- Chat Header -->
+      <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-700 flex items-center justify-between">
+        <h3 class="font-medium text-white">Chat</h3>
+        <button onclick="toggleChatSidebar()" class="lg:hidden text-gray-400 hover:text-white p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            >
+            </path>
+          </svg>
+        </button>
+      </div>
+      
+<!-- Messages -->
+      <div id="chat-messages" class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2 sm:space-y-3">
+        <!-- Messages will be added dynamically -->
+      </div>
+      
+<!-- Message Input -->
+      <div class="border-t border-gray-700 p-3 sm:p-4">
+        <form id="message-form" class="flex space-x-2">
+          <input
+            id="message-input"
+            type="text"
+            placeholder="Type a message..."
+            class="flex-1 px-3 py-2 bg-gray-700 text-white border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+            maxlength="1000"
+          />
+          <button
+            type="submit"
+            class="bg-blue-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base touch-manipulation"
+          >
+            <span class="hidden sm:inline">Send</span>
+            <svg class="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+              >
+              </path>
+            </svg>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden audio element for incoming call sounds -->
+<audio id="notification-sound" preload="auto">
+  <source src="/sounds/notification.mp3" type="audio/mpeg" />
+</audio>
+
+<script>
+  // Function to switch video to main view
+  function switchToMainVideo(videoId) {
+    const mainVideoElement = document.getElementById('main-video-element');
+    const mainVideoLabel = document.getElementById('main-video-label');
+
+    if (videoId === 'local') {
+      const localVideo = document.getElementById('local-video');
+      if (localVideo && localVideo.srcObject) {
+        mainVideoElement.srcObject = localVideo.srcObject;
+        mainVideoElement.muted = true; // Mute local video to avoid feedback
+        mainVideoLabel.textContent = 'You';
+      }
+    } else {
+      const remoteVideo = document.getElementById(`video-${videoId}`);
+      if (remoteVideo) {
+        const video = remoteVideo.querySelector('video');
+        if (video && video.srcObject) {
+          mainVideoElement.srcObject = video.srcObject;
+          mainVideoElement.muted = false; // Enable audio for remote videos
+          mainVideoLabel.textContent = `User ${videoId}`;
+        }
+      }
+    }
+  }
+
+  // Function to toggle chat sidebar
+  function toggleChatSidebar() {
+    const chatSidebar = document.getElementById('chat-sidebar');
+    const isLargeScreen = window.innerWidth >= 1024; // lg breakpoint
+
+    if (isLargeScreen) {
+      // On desktop, just toggle visibility
+      chatSidebar.classList.toggle('hidden');
+    } else {
+      // On mobile/tablet, toggle between hidden and flex
+      if (chatSidebar.classList.contains('hidden')) {
+        chatSidebar.classList.remove('hidden');
+        chatSidebar.classList.add('flex');
+        // Add backdrop
+        const backdrop = document.createElement('div');
+        backdrop.id = 'chat-backdrop';
+        backdrop.className = 'fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden';
+        backdrop.onclick = toggleChatSidebar;
+        document.body.appendChild(backdrop);
+        // Make chat sidebar full screen on mobile
+        chatSidebar.classList.add('fixed', 'inset-0', 'z-50', 'lg:relative', 'lg:inset-auto', 'lg:z-auto');
+      } else {
+        chatSidebar.classList.add('hidden');
+        chatSidebar.classList.remove('flex', 'fixed', 'inset-0', 'z-50');
+        // Remove backdrop
+        const backdrop = document.getElementById('chat-backdrop');
+        if (backdrop) {
+          backdrop.remove();
+        }
+      }
+    }
+  }
+
+  // Close chat on window resize if needed
+  window.addEventListener('resize', () => {
+    const chatSidebar = document.getElementById('chat-sidebar');
+    const isLargeScreen = window.innerWidth >= 1024;
+
+    if (isLargeScreen && chatSidebar.classList.contains('fixed')) {
+      // Reset to desktop layout
+      chatSidebar.classList.remove('hidden', 'fixed', 'inset-0', 'z-50');
+      chatSidebar.classList.add('flex');
+      const backdrop = document.getElementById('chat-backdrop');
+      if (backdrop) {
+        backdrop.remove();
+      }
+    }
+  });
+
+  // Handle orientation change on mobile
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => {
+      // Force a repaint to handle orientation change
+      const chatSidebar = document.getElementById('chat-sidebar');
+      if (chatSidebar && !chatSidebar.classList.contains('hidden')) {
+        chatSidebar.style.height = window.innerHeight + 'px';
+      }
+    }, 100);
+  });
+</script>
+
+<style>
+  /* Mobile-first responsive design */
+
+  /* Participants strip scrolling */
+  #participants-strip {
+    scrollbar-width: thin;
+    scrollbar-color: #4b5563 #374151;
+  }
+
+  #participants-strip::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  @media (min-width: 640px) {
+    #participants-strip::-webkit-scrollbar {
+      height: 6px;
+    }
+  }
+
+  #participants-strip::-webkit-scrollbar-track {
+    background: #374151;
+    border-radius: 3px;
+  }
+
+  #participants-strip::-webkit-scrollbar-thumb {
+    background: #4b5563;
+    border-radius: 3px;
+  }
+
+  #participants-strip::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+  }
+
+  /* Video containers - responsive sizing */
+  .video-container {
+    position: relative;
+    background: #1f2937;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  /* Mobile video containers */
+  .video-container {
+    width: 80px;
+    height: 56px;
+    min-width: 80px;
+    min-height: 56px;
+  }
+
+  /* Tablet and desktop video containers */
+  @media (min-width: 640px) {
+    .video-container {
+      width: 128px;
+      height: 96px;
+      min-width: 128px;
+      min-height: 96px;
+    }
+  }
+
+  .video-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* Video state indicators */
+  .video-muted::after {
+    content: "🔇";
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+
+  @media (min-width: 640px) {
+    .video-muted::after {
+      top: 8px;
+      right: 8px;
+      padding: 4px 8px;
+      font-size: 14px;
+    }
+  }
+
+  .video-off::after {
+    content: "📹";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 18px;
+  }
+
+  @media (min-width: 640px) {
+    .video-off::after {
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 24px;
+    }
+  }
+
+  /* Chat messages styling - responsive */
+  .chat-message {
+    padding: 6px 10px;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    max-width: 100%;
+    word-wrap: break-word;
+    font-size: 14px;
+  }
+
+  @media (min-width: 640px) {
+    .chat-message {
+      padding: 8px 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      max-width: 280px;
+      font-size: 16px;
+    }
+  }
+
+  .chat-message.own {
+    background: #3b82f6;
+    color: white;
+    margin-left: auto;
+    margin-right: 0;
+  }
+
+  .chat-message.other {
+    background: #374151;
+    color: white;
+    margin-left: 0;
+    margin-right: auto;
+  }
+
+  .chat-message.system {
+    background: #6b7280;
+    color: white;
+    font-style: italic;
+    text-align: center;
+    margin: 0 auto;
+  }
+
+  /* Button states */
+  .btn-active {
+    background: #ef4444 !important;
+  }
+
+  .btn-inactive {
+    background: #6b7280 !important;
+  }
+
+  /* Touch-friendly buttons */
+  .touch-manipulation {
+    touch-action: manipulation;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Typing indicator */
+  .typing-indicator {
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+  }
+
+  /* Mobile chat overlay */
+  @media (max-width: 1023px) {
+    #chat-sidebar.fixed {
+      background: #1f2937;
+    }
+  }
+
+  /* Prevent body scroll when chat is open on mobile */
+  body.chat-open {
+    overflow: hidden;
+  }
+
+  /* Handle safe area insets for mobile devices */
+  @supports (padding: max(0px)) {
+    .safe-area-padding {
+      padding-left: max(12px, env(safe-area-inset-left));
+      padding-right: max(12px, env(safe-area-inset-right));
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+    }
+  }
+
+  /* Improve video rendering on mobile */
+  video {
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+
+  /* Landscape mode adjustments */
+  @media screen and (orientation: landscape) and (max-height: 500px) {
+    #participants-strip {
+      bottom: 8px;
+    }
+
+    .chat-message {
+      font-size: 13px;
+      padding: 4px 8px;
+    }
+  }
+
+  /* High DPI displays */
+  @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .video-container {
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: optimize-contrast;
+    }
+  }
+</style>
